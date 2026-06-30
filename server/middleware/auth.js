@@ -79,7 +79,9 @@ export const sendTokenCookie = (res, token) => {
   const options = {
     expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production'
+    // Use HTTPS-only cookies only when explicitly enabled (e.g. TLS reverse proxy)
+    secure: process.env.COOKIE_SECURE === 'true',
+    sameSite: 'lax'
   };
 
   res.cookie('token', token, options);

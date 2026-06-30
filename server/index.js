@@ -1,9 +1,14 @@
+import './loadEnv.js';
+
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { existsSync } from 'fs';
 
 // Routes
 import authRoutes from './routes/auth.js';
@@ -19,13 +24,17 @@ import { errorHandler } from './middleware/errorHandler.js';
 // Initialize app
 const app = express();
 const PORT = process.env.PORT || 5000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/doctor-patient-portal';
+const process.env.MONGODB_URI || 'mongodb://host.docker.internal:27017/doctor-patient-portal';
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const distPath = path.join(__dirname, '..', 'dist');
 
 // Create HTTP server and attach Socket.io
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: 'http://localhost:5173',
+    origin: CLIENT_ORIGIN,
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -57,7 +66,7 @@ global.io = io;
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: CLIENT_ORIGIN,
   credentials: true
 }));
 
@@ -69,13 +78,29 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/queue', queueRoutes);
 app.use('/api/ratings', ratingRoutes);
 
+// Production / Docker: Vite build served by Express (same origin as API)
+if (existsSync(distPath)) {
+  app.use(express.static(distPath));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(distPath, 'index.html'), (err) => (err ? next(err) : undefined));
+  });
+}
+
+app.use((req, res) => {
+  if (req.path.startsWith('/api')) {
+    return res.status(404).json({ success: false, message: 'Not found' });
+  }
+  res.status(404).type('text').send('Not found');
+});
+
 // Error handler middleware
 app.use(errorHandler);
 
 // Connect to MongoDB and start server
 const startServer = () => {
   if (!httpServer.listening) {
-    httpServer.listen(PORT, () => {
+    httpServer.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);
     });
   }

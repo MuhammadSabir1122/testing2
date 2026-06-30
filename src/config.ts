@@ -1,10 +1,18 @@
 // Configuration constants for the application
 
-// API URL - change based on environment
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// API base URL (Docker/production: set VITE_API_URL=/api for same-origin)
+const viteApi = import.meta.env.VITE_API_URL as string | undefined;
+export const API_URL =
+  viteApi !== undefined && viteApi !== '' ? viteApi : 'http://localhost:5000/api';
 
-// Socket.io URL - typically same as API URL but without the path
-export const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+// Socket.io server URL (unset/empty = current browser origin in client)
+const viteSocket = import.meta.env.VITE_SOCKET_URL as string | undefined;
+export const SOCKET_URL =
+  viteSocket !== undefined && viteSocket !== ''
+    ? viteSocket
+    : typeof window !== 'undefined'
+      ? window.location.origin
+      : 'http://localhost:5000';
 
 // Specialist options for doctor signup
 export const SPECIALIST_OPTIONS = [
